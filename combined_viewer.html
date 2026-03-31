@@ -576,6 +576,9 @@
         let websiteEnabled = true; // Checkbox controls whether website feature is enabled
         // Screen normal direction - screen faces toward positive X (toward model center)
         const screenNormal = new THREE.Vector3(1, 0, 0); // Pointing in positive X direction
+        // Zoom tracking
+        let initialCameraDistance = 0;
+        let zoomScale = 1.0;
 
         // Detect portrait mode and apply transparency (not needed - always portrait)
         function updatePortraitMode() {
@@ -769,6 +772,9 @@
                 await new Promise(resolve => setTimeout(resolve, 500));
                 document.getElementById('loading').classList.add('hidden');
 
+                // Initialize zoom tracking
+                initialCameraDistance = camera.position.distanceTo(combinedMesh.position);
+
                 animate();
                 return;
 
@@ -798,8 +804,9 @@
             /// Set position and dimensions inline (9:16 portrait with scale)
             const baseWidth = 281.25;  /* 500 * 9/16 = 281.25 */
             const baseHeight = 500;
-            const width = baseWidth * websiteScale;
-            const height = baseHeight * websiteScale;
+            // Apply both manual scale and zoom scale from camera distance
+            const width = baseWidth * websiteScale * zoomScale;
+            const height = baseHeight * websiteScale * zoomScale;
 
             websiteScreen.style.left = `${x}px`;
             websiteScreen.style.top = `${y}px`;
@@ -841,6 +848,10 @@
             if (combinedMesh) {
                 combinedMesh.rotation.x = THREE.MathUtils.degToRad(modelRotationX);
                 combinedMesh.rotation.y = THREE.MathUtils.degToRad(modelRotationY);
+
+                // Update zoom scale based on camera distance
+                const currentDistance = camera.position.distanceTo(combinedMesh.position);
+                zoomScale = initialCameraDistance / currentDistance;
             }
 
             // Always update screen position (handles visibility internally)
