@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holobox Combined Viewer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0f;
+            color: #fff;
+            overflow: hidden;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        #website-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            /* Enable 3D perspective for child elements */
+            perspective: 1000px;
+            perspective-origin: center center;
+        }
+        .website-screen {
+            position: absolute;
+            /* 9:16 portrait ratio - 500px height */
+            width: 281.25px !important;  /* 500 * 9/16 = 281.25 */
+            height: 500px !important;
+            background: transparent !important;
+            border: none;
+            border-radius: 2px;
+            overflow: hidden;
+            box-shadow: none;
+            opacity: 1;
+            pointer-events: auto;
+            /* Enable 3D transforms */
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+            /* Pepper's Ghost effect: semi-transparent by default */
+            mix-blend-mode: hard-light;
+            /* Smooth transition only for opacity, not transform (instant 3D updates) */
+            transition: opacity 0.3s ease;
+        }
+        .website-screen iframe {
+            width: 281.25px !important;
+            height: 500px !important;
+            border: none;
+            background: transparent !important;
+            /* Pepper's Ghost effect: invert white to transparent */
+            filter: invert(1) brightness(1.5);
+            /* Ensure iframe doesn't interfere with 3D transforms */
+            backface-visibility: hidden;
+        }
+        /* Direction arrows overlay */
+        #direction-arrows {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+        }
+        .direction-arrow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .arrow-btn {
+            width: 36px;
+            height: 36px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.2s;
+            color: #fff;
+        }
+        .arrow-btn:hover {
+            transform: scale(1.1);
+        }
+        .arrow-btn:active {
+            transform: scale(0.95);
+        }
+        .arrow-x { background: #ef4444; }
+        .arrow-y { background: #22c55e; }
+        .arrow-z { background: #3b82f6; }
+        .arrow-label {
+            min-width: 80px;
+        }
+        .screen-glow {
+            position: absolute;
+            top: -15px;
+            left: -15px;
+            right: -15px;
+            bottom: -15px;
+            border: 2px solid rgba(59, 130, 246, 0.5);
+            border-radius: 15px;
+            pointer-events: none;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.02); }
+        }
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.85);
+            padding: 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            min-width: 280px;
+            max-height: 90vh;
+            overflow-y: auto;
+            z-index: 100;
+        }
+        #controls h3 {
+            margin-bottom: 15px;
+            color: #3b82f6;
+            font-size: 16px;
+        }
+        .control-section {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #374151;
+        }
+        .control-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        .control-group {
+            margin-bottom: 12px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        .control-group input[type="range"] {
+            width: 100%;
+            accent-color: #3b82f6;
+        }
+        .control-group input[type="color"] {
+            width: 100%;
+            height: 35px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .control-group input[type="text"] {
+            width: 100%;
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .control-group input[type="text"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        .value-display {
+            float: right;
+            color: #3b82f6;
+            font-weight: 500;
+        }
+        #info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.85);
+            padding: 15px 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            font-size: 13px;
+            z-index: 100;
+        }
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 1000;
+        }
+        #loading.hidden { display: none; }
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid #1f2937;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .btn {
+            width: 100%;
+            background: #3b82f6;
+            border: none;
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+            margin-top: 8px;
+        }
+        .btn:hover { background: #2563eb; }
+        .btn-group { display: flex; gap: 8px; }
+        .btn-group .btn { margin-top: 0; }
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            accent-color: #3b82f6;
+        }
+        .checkbox-group label {
+            margin: 0;
+            color: #fff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div id="loading-text">Loading frame 61...</div>
+        <div id="loading-subtext" style="margin-top: 10px; color: #9ca3af; font-size: 12px;">Please wait...</div>
+    </div>
+
+    <div id="canvas-container"></div>
+    <div id="website-overlay">
+        <div class="website-screen" id="website-screen">
+            <iframe id="website-iframe" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+        </div>
+    </div>
+
+    <div id="controls">
+        <h3>🎨 Material Controls</h3>
+
+        <div class="control-section">
+            <div class="control-group">
+                <label>Base Color <span class="value-display" id="color-val">#4a9eff</span></label>
+                <input type="color" id="base-color" value="#4a9eff">
+            </div>
+
+            <div class="control-group">
+                <label>Metalness <span class="value-display" id="metal-val">0.7</span></label>
+                <input type="range" id="metalness" min="0" max="1" step="0.01" value="0.7">
+            </div>
+
+            <div class="control-group">
+                <label>Roughness <span class="value-display" id="rough-val">0.3</span></label>
+                <input type="range" id="roughness" min="0" max="1" step="0.01" value="0.3">
+            </div>
+
+            <div class="control-group">
+                <label>Emissive <span class="value-display" id="emissive-val">0.0</span></label>
+                <input type="range" id="emissive" min="0" max="1" step="0.01" value="0">
+            </div>
+
+            <div class="control-group">
+                <label>Opacity <span class="value-display" id="opacity-val">1.0</span></label>
+                <input type="range" id="opacity" min="0" max="1" step="0.01" value="1">
+            </div>
+
+            <div class="control-group checkbox-group">
+                <input type="checkbox" id="wireframe">
+                <label for="wireframe">Wireframe</label>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn" id="random-btn">Random</button>
+                <button class="btn" id="reset-btn">Reset</button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3 style="margin-bottom: 10px; font-size: 14px; color: #3b82f6;">🌐 Website Display</h3>
+
+            <div class="control-group">
+                <label>Website URL</label>
+                <input type="text" id="website-url" placeholder="https://example.com" value="https://www.wikipedia.org">
+            </div>
+
+            <button class="btn" id="load-website-btn">Load Website</button>
+
+            <div class="control-group checkbox-group" style="margin-top: 10px;">
+                <input type="checkbox" id="show-website" checked>
+                <label for="show-website">Show Website Screen</label>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn" onclick="loadWebsitePreset('https://www.wikipedia.org')">Wiki</button>
+                <button class="btn" onclick="loadWebsitePreset('https://threejs.org')">Three.js</button>
+            </div>
+            <div class="btn-group" style="margin-top: 8px;">
+                <button class="btn" onclick="loadWebsitePreset('https://news.ycombinator.com')">HN</button>
+                <button class="btn" onclick="loadWebsitePreset('https://google.com')">Google</button>
+            </div>
+
+            <div class="control-group" style="margin-top: 15px;">
+                <label>Position X</label>
+                <input type="number" id="pos-x" value="-2" step="0.1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #fff;">
+                <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Range: -30 to -10</div>
+            </div>
+            <div class="control-group">
+                <label>Position Y</label>
+                <input type="number" id="pos-y" value="0" step="0.1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #fff;">
+                <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Range: -10 to 10</div>
+            </div>
+            <div class="control-group">
+                <label>Position Z</label>
+                <input type="number" id="pos-z" value="0" step="0.1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #fff;">
+                <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Range: -10 to 30</div>
+            </div>
+
+            <div class="control-group">
+                <label>Website Scale <span id="scale-val" style="color: #3b82f6;">1.0</span></label>
+                <input type="number" id="website-scale" value="1.0" min="0.1" max="3" step="0.1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #fff;">
+                <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Base size: 281.25×500px (9:16) | Range: 0.1 to 3.0</div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3 style="margin-bottom: 10px; font-size: 14px; color: #3b82f6;">🔄 Model Rotation</h3>
+
+            <div class="control-group">
+                <label>Rotation X (degrees)</label>
+                <input type="number" id="rot-x" value="0" step="1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #fff;">
+            </div>
+            <div class="control-group">
+                <label>Rotation Y (degrees)</label>
+                <input type="number" id="rot-y" value="-85" step="1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #fff;">
+            </div>
+
+            <div class="btn-group">
+                <button class="btn" id="reset-rotation-btn">Reset Rotation</button>
+                <button class="btn" id="reset-position-btn">Reset Position</button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3 style="margin-bottom: 10px; font-size: 14px; color: #3b82f6;">✨ Presets</h3>
+            <div class="btn-group">
+                <button class="btn" onclick="applyPreset('chrome')">Chrome</button>
+                <button class="btn" onclick="applyPreset('gold')">Gold</button>
+                <button class="btn" onclick="applyPreset('glass')">Glass</button>
+            </div>
+            <div class="btn-group" style="margin-top: 8px;">
+                <button class="btn" onclick="applyPreset('hologram')">Holo</button>
+                <button class="btn" onclick="applyPreset('ceramic')">Ceramic</button>
+                <button class="btn" onclick="applyPreset('glow')">Glow</button>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h3 style="margin-bottom: 10px; font-size: 14px; color: #3b82f6;">🎬 Animation</h3>
+            <div class="checkbox-group">
+                <input type="checkbox" id="auto-rotate">
+                <label for="auto-rotate">Auto Rotate</label>
+            </div>
+            <div class="control-group" style="margin-top: 10px;">
+                <label>Rotation Speed <span class="value-display" id="rotation-val">0.5</span></label>
+                <input type="range" id="rotation-speed" min="0" max="5" step="0.1" value="0.5">
+            </div>
+        </div>
+    </div>
+
+    <div id="info">
+        <strong>Holobox Frame 61</strong><br>
+        Vertices: <span id="vertex-count">0</span><br>
+        Triangles: <span id="triangle-count">0</span>
+    </div>
+
+    <div id="direction-arrows">
+        <div class="direction-arrow">
+            <button class="arrow-btn arrow-x" id="arrow-x-neg" title="X Negative (Left)">←</button>
+            <span class="arrow-label">X: <span id="arrow-x-val">-2</span></span>
+            <button class="arrow-btn arrow-x" id="arrow-x-pos" title="X Positive (Right)">→</button>
+        </div>
+        <div class="direction-arrow">
+            <button class="arrow-btn arrow-y" id="arrow-y-neg" title="Y Negative (Down)">↓</button>
+            <span class="arrow-label">Y: <span id="arrow-y-val">0</span></span>
+            <button class="arrow-btn arrow-y" id="arrow-y-pos" title="Y Positive (Up)">↑</button>
+        </div>
+        <div class="direction-arrow">
+            <button class="arrow-btn arrow-z" id="arrow-z-neg" title="Z Negative (Away)">-</button>
+            <span class="arrow-label">Z: <span id="arrow-z-val">0</span></span>
+            <button class="arrow-btn arrow-z" id="arrow-z-pos" title="Z Positive (Closer)">+</button>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+        // Scene setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0f);
+        scene.fog = new THREE.Fog(0x0a0a0f, 50, 150);
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(-18.828429785002662, 1.6530266904612632, 0.6900302161050372);
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.5;
+
+        // Environment - Studio lighting setup
+        const envTexture = createEnvTexture();
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        mainLight.position.set(30, 50, 30);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 4096;
+        mainLight.shadow.mapSize.height = 4096;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 200;
+        mainLight.shadow.camera.left = -50;
+        mainLight.shadow.camera.right = 50;
+        mainLight.shadow.camera.top = 50;
+        mainLight.shadow.camera.bottom = -50;
+        mainLight.shadow.bias = -0.0001;
+        scene.add(mainLight);
+
+        // Fill lights for studio effect
+        const fillLight1 = new THREE.DirectionalLight(0x4a9eff, 0.5);
+        fillLight1.position.set(-30, 20, -30);
+        scene.add(fillLight1);
+
+        const fillLight2 = new THREE.DirectionalLight(0xff6b6b, 0.3);
+        fillLight2.position.set(30, 10, -30);
+        scene.add(fillLight2);
+
+        const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
+        rimLight.position.set(0, -20, -40);
+        scene.add(rimLight);
+
+        // Ground plane with reflective material
+        const groundGeometry = new THREE.PlaneGeometry(200, 200);
+        const groundMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a2e,
+            roughness: 0.4,
+            metalness: 0.8,
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -8;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Grid helper
+        const gridHelper = new THREE.GridHelper(100, 50, 0x3b82f6, 0x1e3a5f);
+        gridHelper.position.y = -7.99;
+        gridHelper.material.opacity = 0.3;
+        gridHelper.material.transparent = true;
+        scene.add(gridHelper);
+
+        // Combined mesh
+        let combinedMesh = null;
+        let originalMaterial = new THREE.MeshStandardMaterial({
+            color: 0x4a9eff,
+            metalness: 0.7,
+            roughness: 0.3,
+        });
+
+        // Website screen
+        const websiteScreen = document.getElementById('website-screen');
+        const websiteIframe = document.getElementById('website-iframe');
+        // Initialize website screen as hidden
+        websiteScreen.style.opacity = '0';
+        websiteScreen.style.pointerEvents = 'none';
+        // Screen position - will be calculated from model geometry
+        let screenPosition = new THREE.Vector3(0, 0, 0); // Start at model center
+        let screenVisible = false; // Current visibility state
+        let websiteEnabled = true; // Checkbox controls whether website feature is enabled
+        // Screen normal direction - screen faces toward positive X (toward model center)
+        const screenNormal = new THREE.Vector3(1, 0, 0); // Pointing in positive X direction
+
+        // Detect portrait mode and apply transparency (not needed - always portrait)
+        function updatePortraitMode() {
+            // Always in portrait 9:16 mode now
+        }
+
+        // Create environment texture for reflections
+        function createEnvTexture() {
+            const size = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, size);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(0.5, '#4a9eff');
+            gradient.addColorStop(1, '#1a1a2e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.beginPath();
+            ctx.arc(size * 0.3, size * 0.3, 30, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(size * 0.7, size * 0.4, 40, 0, Math.PI * 2);
+            ctx.fill();
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+            return texture;
+        }
+
+        // Create procedural texture
+        function createProceduralTexture(type) {
+            const size = 1024;
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            switch(type) {
+                case 'noise':
+                    const imageData = ctx.createImageData(size, size);
+                    for (let i = 0; i < imageData.data.length; i += 4) {
+                        const noise = Math.random() * 255;
+                        imageData.data[i] = noise;
+                        imageData.data[i + 1] = noise;
+                        imageData.data[i + 2] = noise;
+                        imageData.data[i + 3] = 255;
+                    }
+                    ctx.putImageData(imageData, 0, 0);
+                    break;
+
+                case 'brushed':
+                    ctx.fillStyle = '#808080';
+                    ctx.fillRect(0, 0, size, size);
+                    for (let i = 0; i < 50000; i++) {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${Math.random() * 0.1})`;
+                        const x = Math.random() * size;
+                        const y = Math.random() * size;
+                        ctx.fillRect(x, y, Math.random() * 50, 1);
+                    }
+                    break;
+
+                case 'carbon':
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.fillRect(0, 0, size, size);
+                    const patternSize = 20;
+                    for (let x = 0; x < size; x += patternSize) {
+                        for (let y = 0; y < size; y += patternSize) {
+                            ctx.fillStyle = Math.random() > 0.5 ? '#2a2a2a' : '#1a1a1a';
+                            ctx.fillRect(x, y, patternSize / 2, patternSize / 2);
+                            ctx.fillRect(x + patternSize / 2, y + patternSize / 2, patternSize / 2, patternSize / 2);
+                        }
+                    }
+                    break;
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+
+        // Normalize geometry attributes
+        function normalizeGeometry(geometry) {
+            if (!geometry.attributes.position) {
+                console.warn('Geometry missing position attribute');
+                return null;
+            }
+
+            const geo = geometry.clone();
+
+            if (!geo.attributes.normal) {
+                geo.computeVertexNormals();
+            }
+
+            if (!geo.attributes.uv) {
+                const positions = geo.attributes.position.count;
+                const uvs = new Float32Array(positions * 2);
+                for (let i = 0; i < positions * 2; i += 2) {
+                    uvs[i] = (i / 2) % 2;
+                    uvs[i + 1] = Math.floor((i / 2) / 2) % 2;
+                }
+                geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+            }
+
+            geo.scale(0.995, 0.995, 0.995);
+            return geo;
+        }
+
+        // Load only frame 61 (model_61.obj)
+        async function loadAndCombineModels() {
+            const objLoader = new OBJLoader();
+            const loadingText = document.getElementById('loading-text');
+            const loadingSubtext = document.getElementById('loading-subtext');
+
+            // Load model_61.obj (the 61st frame)
+            const frameIndex = 61;
+
+            try {
+                const object = await new Promise((resolve, reject) => {
+                    objLoader.load(
+                        `model_${frameIndex}.obj`,
+                        resolve,
+                        undefined,
+                        reject
+                    );
+                });
+
+                loadingText.textContent = `Loading model_61.obj...`;
+
+                // Extract geometry from frame 61
+                let geometry = null;
+                object.traverse((child) => {
+                    if (child.isMesh && child.geometry) {
+                        const normalizedGeo = normalizeGeometry(child.geometry);
+                        if (normalizedGeo) {
+                            geometry = normalizedGeo;
+                        }
+                    }
+                });
+
+                if (!geometry) {
+                    loadingSubtext.textContent = 'Error: No geometry loaded!';
+                    return;
+                }
+
+                loadingSubtext.textContent = 'Processing geometry...';
+
+                // Create material with textures
+                const noiseTexture = createProceduralTexture('noise');
+                const brushedTexture = createProceduralTexture('brushed');
+
+                originalMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x4a9eff,
+                    metalness: 0.7,
+                    roughness: 0.3,
+                    roughnessMap: noiseTexture,
+                    bumpMap: brushedTexture,
+                    bumpScale: 0.02,
+                    envMap: envTexture,
+                    envMapIntensity: 1.0,
+                });
+
+                combinedMesh = new THREE.Mesh(geometry, originalMaterial);
+                combinedMesh.castShadow = true;
+                combinedMesh.receiveShadow = true;
+
+                // Center the mesh
+                geometry.computeBoundingBox();
+                const center = geometry.boundingBox.getCenter(new THREE.Vector3());
+                geometry.translate(-center.x, -center.y, -center.z);
+
+                scene.add(combinedMesh);
+
+                // Use manual screen position from controls, not detected from geometry
+                screenPosition.set(-2, 0, 0);
+                console.log('Screen position set to manual values:', screenPosition);
+
+                // Update info
+                document.getElementById('vertex-count').textContent =
+                    geometry.attributes.position.count.toLocaleString();
+                document.getElementById('triangle-count').textContent =
+                    (geometry.index ? geometry.index.count / 3 :
+                     geometry.attributes.position.count / 3).toLocaleString();
+
+                loadingSubtext.textContent = 'Complete!';
+                await new Promise(resolve => setTimeout(resolve, 500));
+                document.getElementById('loading').classList.add('hidden');
+
+                animate();
+                return;
+
+            } catch (error) {
+                console.error('Error loading model:', error);
+                loadingSubtext.textContent = 'Error loading frame 61!';
+            }
+        }
+
+        // Update screen position
+        function updateScreenPosition() {
+            if (!combinedMesh) return;
+
+            // Use the model's world matrix to transform the screen position
+            // This automatically handles all rotations and position changes
+            combinedMesh.updateMatrixWorld();
+
+            // Clone the local screen position and apply the model's world matrix
+            const screenPos = screenPosition.clone().applyMatrix4(combinedMesh.matrixWorld);
+
+            // Project to 2D screen coordinates
+            screenPos.project(camera);
+
+            const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-(screenPos.y * 0.5) + 0.5) * window.innerHeight;
+
+            /// Set position and dimensions inline (9:16 portrait with scale)
+            const baseWidth = 281.25;  /* 500 * 9/16 = 281.25 */
+            const baseHeight = 500;
+            const width = baseWidth * websiteScale;
+            const height = baseHeight * websiteScale;
+
+            websiteScreen.style.left = `${x}px`;
+            websiteScreen.style.top = `${y}px`;
+            websiteScreen.style.width = `${width}px`;
+            websiteScreen.style.height = `${height}px`;
+
+            // Calculate viewing angles from camera to model for proper 3D perspective
+            const modelWorldPos = new THREE.Vector3();
+            combinedMesh.getWorldPosition(modelWorldPos);
+
+            const cameraToModel = new THREE.Vector3().subVectors(modelWorldPos, camera.position).normalize();
+
+            // Calculate horizontal angle (around Y axis) for rotateY
+            const horizontalAngle = Math.atan2(cameraToModel.x, cameraToModel.z);
+            const rotYDeg = -THREE.MathUtils.radToDeg(horizontalAngle);
+
+            // Calculate vertical angle (around X axis) for rotateX
+            const horizontalDist = Math.sqrt(cameraToModel.x * cameraToModel.x + cameraToModel.z * cameraToModel.z);
+            const verticalAngle = Math.atan2(cameraToModel.y, horizontalDist);
+            const rotXDeg = THREE.MathUtils.radToDeg(verticalAngle);
+
+            // Apply 3D rotation transforms based on viewing angle
+            websiteScreen.style.setProperty('transform', `translate(-50%, -50%) rotateX(${rotXDeg}deg) rotateY(${rotYDeg}deg)`, 'important');
+
+            // Update visibility - just show when enabled, no dot product check
+            if (websiteEnabled !== screenVisible) {
+                screenVisible = websiteEnabled;
+                websiteScreen.style.opacity = websiteEnabled ? '0.85' : '0';
+                websiteScreen.style.pointerEvents = websiteEnabled ? 'auto' : 'none';
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Apply manual rotation to the model
+            if (combinedMesh) {
+                combinedMesh.rotation.x = THREE.MathUtils.degToRad(modelRotationX);
+                combinedMesh.rotation.y = THREE.MathUtils.degToRad(modelRotationY);
+            }
+
+            // Always update screen position (handles visibility internally)
+            updateScreenPosition();
+
+            renderer.render(scene, camera);
+        }
+
+        // Controls
+        const baseColorInput = document.getElementById('base-color');
+        const metalnessInput = document.getElementById('metalness');
+        const roughnessInput = document.getElementById('roughness');
+        const emissiveInput = document.getElementById('emissive');
+        const opacityInput = document.getElementById('opacity');
+        const wireframeInput = document.getElementById('wireframe');
+        const autoRotateInput = document.getElementById('auto-rotate');
+        const rotationSpeedInput = document.getElementById('rotation-speed');
+        const showWebsiteInput = document.getElementById('show-website');
+
+        // Disable auto-rotate by default
+        controls.autoRotate = false;
+        controls.enableDamping = true;
+
+        // Rotation controls
+        let modelRotationX = 0;
+        let modelRotationY = -85;
+
+        function updateMaterial() {
+            if (!combinedMesh) return;
+
+            const color = new THREE.Color(baseColorInput.value);
+            const metalness = parseFloat(metalnessInput.value);
+            const roughness = parseFloat(roughnessInput.value);
+            const opacity = parseFloat(opacityInput.value);
+            const emissiveIntensity = parseFloat(emissiveInput.value);
+            const wireframe = wireframeInput.checked;
+
+            if (combinedMesh.isMesh) {
+                combinedMesh.material.color = color;
+                combinedMesh.material.metalness = metalness;
+                combinedMesh.material.roughness = roughness;
+                combinedMesh.material.opacity = opacity;
+                combinedMesh.material.transparent = opacity < 1;
+                combinedMesh.material.wireframe = wireframe;
+                combinedMesh.material.emissive = color.clone().multiplyScalar(emissiveIntensity);
+                combinedMesh.material.emissiveIntensity = emissiveIntensity;
+            } else if (combinedMesh.isGroup) {
+                combinedMesh.children.forEach(child => {
+                    if (child.isMesh) {
+                        child.material.color = color;
+                        child.material.metalness = metalness;
+                        child.material.roughness = roughness;
+                        child.material.opacity = opacity;
+                        child.material.transparent = opacity < 1;
+                        child.material.wireframe = wireframe;
+                        child.material.emissive = color.clone().multiplyScalar(emissiveIntensity);
+                        child.material.emissiveIntensity = emissiveIntensity;
+                    }
+                });
+            }
+
+            document.getElementById('color-val').textContent = baseColorInput.value;
+            document.getElementById('metal-val').textContent = metalnessInput.value;
+            document.getElementById('rough-val').textContent = roughnessInput.value;
+            document.getElementById('emissive-val').textContent = emissiveInput.value;
+            document.getElementById('opacity-val').textContent = opacityInput.value;
+        }
+
+        baseColorInput.addEventListener('input', updateMaterial);
+        metalnessInput.addEventListener('input', updateMaterial);
+        roughnessInput.addEventListener('input', updateMaterial);
+        emissiveInput.addEventListener('input', updateMaterial);
+        opacityInput.addEventListener('input', updateMaterial);
+        wireframeInput.addEventListener('change', updateMaterial);
+
+        autoRotateInput.addEventListener('change', (e) => {
+            controls.autoRotate = e.target.checked;
+        });
+
+        rotationSpeedInput.addEventListener('input', (e) => {
+            controls.autoRotateSpeed = parseFloat(e.target.value);
+            document.getElementById('rotation-val').textContent = e.target.value;
+        });
+
+        showWebsiteInput.addEventListener('change', (e) => {
+            websiteEnabled = e.target.checked;
+            // Trigger an immediate update
+            updateScreenPosition();
+        });
+
+        // Screen size removed - always 144x256 portrait
+
+
+        document.getElementById('random-btn').addEventListener('click', () => {
+            const randomColor = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+            baseColorInput.value = randomColor;
+            metalnessInput.value = Math.random().toFixed(2);
+            roughnessInput.value = Math.random().toFixed(2);
+            updateMaterial();
+        });
+
+        document.getElementById('reset-btn').addEventListener('click', () => {
+            baseColorInput.value = '#4a9eff';
+            metalnessInput.value = 0.7;
+            roughnessInput.value = 0.3;
+            emissiveInput.value = 0;
+            opacityInput.value = 1;
+            wireframeInput.checked = false;
+            updateMaterial();
+        });
+
+        // Website controls
+        document.getElementById('load-website-btn').addEventListener('click', () => {
+            const url = document.getElementById('website-url').value.trim();
+            if (url) {
+                let finalUrl = url;
+                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                    finalUrl = 'https://' + url;
+                }
+                websiteIframe.src = finalUrl;
+                websiteEnabled = true;
+                showWebsiteInput.checked = true;
+                updateScreenPosition();
+            }
+        });
+
+        document.getElementById('website-url').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('load-website-btn').click();
+            }
+        });
+
+        window.loadWebsitePreset = function(url) {
+            document.getElementById('website-url').value = url;
+            document.getElementById('load-website-btn').click();
+        };
+
+        // Position inputs
+        const posXInput = document.getElementById('pos-x');
+        const posYInput = document.getElementById('pos-y');
+        const posZInput = document.getElementById('pos-z');
+
+        function updatePositionFromInputs() {
+            screenPosition.x = parseFloat(posXInput.value) || -20;
+            screenPosition.y = parseFloat(posYInput.value) || 0;
+            screenPosition.z = parseFloat(posZInput.value) || 18;
+            updatePositionDisplay();
+            updateScreenPosition();
+        }
+
+        posXInput.addEventListener('input', updatePositionFromInputs);
+        posYInput.addEventListener('input', updatePositionFromInputs);
+        posZInput.addEventListener('input', updatePositionFromInputs);
+
+        // Rotation inputs
+        const rotXInput = document.getElementById('rot-x');
+        const rotYInput = document.getElementById('rot-y');
+
+        rotXInput.addEventListener('input', () => {
+            modelRotationX = parseFloat(rotXInput.value) || 0;
+        });
+
+        rotYInput.addEventListener('input', () => {
+            modelRotationY = parseFloat(rotYInput.value) || 0;
+        });
+
+        document.getElementById('reset-rotation-btn').addEventListener('click', () => {
+            modelRotationX = 0;
+            modelRotationY = 0;
+            rotXInput.value = 0;
+            rotYInput.value = 0;
+        });
+
+        document.getElementById('reset-position-btn').addEventListener('click', () => {
+            screenPosition.set(-2, 0, 0);
+            posXInput.value = -2;
+            posYInput.value = 0;
+            posZInput.value = 0;
+            updatePositionDisplay();
+            updateScreenPosition();
+        });
+
+        // Scale control
+        const scaleInput = document.getElementById('website-scale');
+        let websiteScale = 1.0; // Base scale, with 700px height this is already large
+
+        scaleInput.addEventListener('input', () => {
+            websiteScale = parseFloat(scaleInput.value) || 1.0;
+            document.getElementById('scale-val').textContent = websiteScale.toFixed(1);
+            updateScreenPosition();
+        });
+
+        // Direction arrows
+        function updatePositionDisplay() {
+            document.getElementById('arrow-x-val').textContent = screenPosition.x.toFixed(1);
+            document.getElementById('arrow-y-val').textContent = screenPosition.y.toFixed(1);
+            document.getElementById('arrow-z-val').textContent = screenPosition.z.toFixed(1);
+        }
+
+        // Arrow button handlers (integer steps)
+        document.getElementById('arrow-x-neg').addEventListener('click', () => {
+            screenPosition.x -= 1;
+            posXInput.value = screenPosition.x.toFixed(1);
+            updatePositionDisplay();
+            updateScreenPosition();
+        });
+
+        document.getElementById('arrow-x-pos').addEventListener('click', () => {
+            screenPosition.x += 1;
+            posXInput.value = screenPosition.x.toFixed(1);
+            updatePositionDisplay();
+            updateScreenPosition();
+        });
+
+        document.getElementById('arrow-y-neg').addEventListener('click', () => {
+            screenPosition.y -= 1;
+            posYInput.value = screenPosition.y.toFixed(1);
+            updatePositionDisplay();
+            updateScreenPosition();
+        });
+
+        document.getElementById('arrow-y-pos').addEventListener('click', () => {
+            screenPosition.y += 1;
+            posYInput.value = screenPosition.y.toFixed(1);
+            updatePositionDisplay();
+            updateScreenPosition();
+        });
+
+        document.getElementById('arrow-z-neg').addEventListener('click', () => {
+            screenPosition.z -= 1;
+            posZInput.value = screenPosition.z.toFixed(1);
+            updatePositionDisplay();
+            updateScreenPosition();
+        });
+
+        document.getElementById('arrow-z-pos').addEventListener('click', () => {
+            screenPosition.z += 1;
+            posZInput.value = screenPosition.z.toFixed(1);
+            updatePositionDisplay();
+            updateScreenPosition();
+        });
+
+        window.applyPreset = function(preset) {
+            const presets = {
+                chrome: { color: '#c0c0c0', metalness: 1.0, roughness: 0.1, emissive: 0 },
+                gold: { color: '#ffd700', metalness: 1.0, roughness: 0.2, emissive: 0 },
+                glass: { color: '#aaddff', metalness: 0.0, roughness: 0.0, emissive: 0, opacity: 0.5 },
+                hologram: { color: '#00ffff', metalness: 0.9, roughness: 0.1, emissive: 0.5, opacity: 0.8 },
+                ceramic: { color: '#ffffff', metalness: 0.0, roughness: 0.3, emissive: 0 },
+                glow: { color: '#4a9eff', metalness: 0.3, roughness: 0.5, emissive: 0.8 }
+            };
+
+            const p = presets[preset];
+            if (p) {
+                baseColorInput.value = p.color;
+                metalnessInput.value = p.metalness;
+                roughnessInput.value = p.roughness;
+                emissiveInput.value = p.emissive;
+                opacityInput.value = p.opacity !== undefined ? p.opacity : 1;
+                updateMaterial();
+            }
+        };
+
+        // Window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            updateScreenPosition();
+            updatePortraitMode();
+        });
+
+        // Orientation change
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                updatePortraitMode();
+                updateScreenPosition();
+            }, 100);
+        });
+
+        // Initialize
+        websiteScreen.classList.add('visible');
+        updatePortraitMode();
+        loadAndCombineModels();
+
+        // Auto-load Wikipedia on startup
+        setTimeout(() => {
+            websiteIframe.src = 'https://www.wikipedia.org';
+            websiteEnabled = true;
+            showWebsiteInput.checked = true;
+            updateScreenPosition();
+        }, 2000);
+    </script>
+</body>
+</html>
