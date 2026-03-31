@@ -310,8 +310,8 @@
 
         <div class="control-section">
             <div class="control-group">
-                <label>Base Color <span class="value-display" id="color-val">#4a9eff</span></label>
-                <input type="color" id="base-color" value="#4a9eff">
+                <label>Base Color <span class="value-display" id="color-val">#000000</span></label>
+                <input type="color" id="base-color" value="#000000">
             </div>
 
             <div class="control-group">
@@ -371,7 +371,7 @@
 
             <div class="control-group" style="margin-top: 15px;">
                 <label>Position X</label>
-                <input type="number" id="pos-x" value="-2" step="0.1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #fff;">
+                <input type="number" id="pos-x" value="-1" step="0.1" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #fff;">
                 <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Range: -30 to -10</div>
             </div>
             <div class="control-group">
@@ -446,7 +446,7 @@
     <div id="direction-arrows">
         <div class="direction-arrow">
             <button class="arrow-btn arrow-x" id="arrow-x-neg" title="X Negative (Left)">←</button>
-            <span class="arrow-label">X: <span id="arrow-x-val">-2</span></span>
+            <span class="arrow-label">X: <span id="arrow-x-val">-1</span></span>
             <button class="arrow-btn arrow-x" id="arrow-x-pos" title="X Positive (Right)">→</button>
         </div>
         <div class="direction-arrow">
@@ -733,7 +733,7 @@
                 const brushedTexture = createProceduralTexture('brushed');
 
                 originalMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x4a9eff,
+                    color: 0x000000,
                     metalness: 0.7,
                     roughness: 0.3,
                     roughnessMap: noiseTexture,
@@ -755,7 +755,7 @@
                 scene.add(combinedMesh);
 
                 // Use manual screen position from controls, not detected from geometry
-                screenPosition.set(-2, 0, 0);
+                screenPosition.set(-1, 0, 0);
                 console.log('Screen position set to manual values:', screenPosition);
 
                 // Update info
@@ -1015,8 +1015,8 @@
         });
 
         document.getElementById('reset-position-btn').addEventListener('click', () => {
-            screenPosition.set(-2, 0, 0);
-            posXInput.value = -2;
+            screenPosition.set(-1, 0, 0);
+            posXInput.value = -1;
             posYInput.value = 0;
             posZInput.value = 0;
             updatePositionDisplay();
