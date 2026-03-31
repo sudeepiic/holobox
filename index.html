@@ -849,6 +849,26 @@
             renderer.render(scene, camera);
         }
 
+        // Log camera position
+        function logCameraPosition() {
+            console.log('Camera position:', {
+                x: camera.position.x,
+                y: camera.position.y,
+                z: camera.position.z
+            });
+            console.log('Format: camera.position.set(' +
+                camera.position.x.toFixed(3) + ', ' +
+                camera.position.y.toFixed(3) + ', ' +
+                camera.position.z.toFixed(3) + ');');
+        }
+
+        // Log camera on load
+        setTimeout(() => {
+            console.log('=== INITIAL CAMERA POSITION ===');
+            logCameraPosition();
+            console.log('Press "c" key to log camera position anytime');
+        }, 1000);
+
         // Controls
         const baseColorInput = document.getElementById('base-color');
         const metalnessInput = document.getElementById('metalness');
@@ -1135,6 +1155,13 @@
                 updatePortraitMode();
                 updateScreenPosition();
             }, 100);
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'c' || e.key === 'C') {
+                logCameraPosition();
+            }
         });
 
         // Initialize
