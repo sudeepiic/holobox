@@ -241,6 +241,52 @@
             color: #fff;
             cursor: pointer;
         }
+        /* Toggle button */
+        #toggle-controls {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #374151;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+        }
+        #toggle-controls:hover {
+            background: rgba(59, 130, 246, 0.8);
+        }
+        /* Controls hidden state */
+        #controls.hidden {
+            transform: translateX(120%);
+            opacity: 0;
+            pointer-events: none;
+        }
+        #controls {
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            #controls {
+                top: 50px;
+                right: 10px;
+                left: 10px;
+                min-width: auto;
+                max-height: calc(100vh - 120px);
+                font-size: 14px;
+            }
+            #toggle-controls {
+                top: 5px;
+                padding: 8px 16px;
+                font-size: 12px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -256,6 +302,8 @@
             <iframe id="website-iframe" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
         </div>
     </div>
+
+    <button id="toggle-controls">🎛️ Hide Controls</button>
 
     <div id="controls">
         <h3>🎨 Material Controls</h3>
@@ -1055,6 +1103,22 @@
                 updateMaterial();
             }
         };
+
+        // Toggle controls visibility
+        const toggleBtn = document.getElementById('toggle-controls');
+        const controlsPanel = document.getElementById('controls');
+        let controlsVisible = true;
+
+        toggleBtn.addEventListener('click', () => {
+            controlsVisible = !controlsVisible;
+            if (controlsVisible) {
+                controlsPanel.classList.remove('hidden');
+                toggleBtn.textContent = '🎛️ Hide Controls';
+            } else {
+                controlsPanel.classList.add('hidden');
+                toggleBtn.textContent = '🎛️ Show Controls';
+            }
+        });
 
         // Window resize
         window.addEventListener('resize', () => {
