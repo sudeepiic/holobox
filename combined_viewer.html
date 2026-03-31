@@ -943,7 +943,6 @@
             screenPosition.x = parseFloat(posXInput.value) || -20;
             screenPosition.y = parseFloat(posYInput.value) || 0;
             screenPosition.z = parseFloat(posZInput.value) || 18;
-            updatePositionDisplay();
             updateScreenPosition();
         }
 
@@ -975,7 +974,6 @@
             posXInput.value = -1;
             posYInput.value = 0;
             posZInput.value = 0;
-            updatePositionDisplay();
             updateScreenPosition();
         });
 
@@ -986,56 +984,6 @@
         scaleInput.addEventListener('input', () => {
             websiteScale = parseFloat(scaleInput.value) || 1.0;
             document.getElementById('scale-val').textContent = websiteScale.toFixed(1);
-            updateScreenPosition();
-        });
-
-        // Direction arrows
-        function updatePositionDisplay() {
-            document.getElementById('arrow-x-val').textContent = screenPosition.x.toFixed(1);
-            document.getElementById('arrow-y-val').textContent = screenPosition.y.toFixed(1);
-            document.getElementById('arrow-z-val').textContent = screenPosition.z.toFixed(1);
-        }
-
-        // Arrow button handlers (integer steps)
-        document.getElementById('arrow-x-neg').addEventListener('click', () => {
-            screenPosition.x -= 1;
-            posXInput.value = screenPosition.x.toFixed(1);
-            updatePositionDisplay();
-            updateScreenPosition();
-        });
-
-        document.getElementById('arrow-x-pos').addEventListener('click', () => {
-            screenPosition.x += 1;
-            posXInput.value = screenPosition.x.toFixed(1);
-            updatePositionDisplay();
-            updateScreenPosition();
-        });
-
-        document.getElementById('arrow-y-neg').addEventListener('click', () => {
-            screenPosition.y -= 1;
-            posYInput.value = screenPosition.y.toFixed(1);
-            updatePositionDisplay();
-            updateScreenPosition();
-        });
-
-        document.getElementById('arrow-y-pos').addEventListener('click', () => {
-            screenPosition.y += 1;
-            posYInput.value = screenPosition.y.toFixed(1);
-            updatePositionDisplay();
-            updateScreenPosition();
-        });
-
-        document.getElementById('arrow-z-neg').addEventListener('click', () => {
-            screenPosition.z -= 1;
-            posZInput.value = screenPosition.z.toFixed(1);
-            updatePositionDisplay();
-            updateScreenPosition();
-        });
-
-        document.getElementById('arrow-z-pos').addEventListener('click', () => {
-            screenPosition.z += 1;
-            posZInput.value = screenPosition.z.toFixed(1);
-            updatePositionDisplay();
             updateScreenPosition();
         });
 
