@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holobox Website Viewer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a0f;
+            color: #fff;
+            overflow: hidden;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        #website-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .website-screen {
+            position: absolute;
+            width: 320px;
+            height: 200px;
+            background: #000;
+            border: 3px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.5);
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: auto;
+        }
+        .website-screen.visible {
+            opacity: 1;
+        }
+        .website-screen iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .screen-frame {
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            border: 2px solid #4a9eff;
+            border-radius: 10px;
+            pointer-events: none;
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background: rgba(0,0,0,0.85);
+            padding: 20px 30px;
+            border-radius: 16px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 90vw;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .control-group label {
+            font-size: 13px;
+            color: #9ca3af;
+            white-space: nowrap;
+        }
+        input[type="text"] {
+            background: #1f2937;
+            border: 1px solid #374151;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            width: 280px;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+        input[type="range"] {
+            width: 150px;
+            accent-color: #3b82f6;
+        }
+        button {
+            background: #3b82f6;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        button:hover { background: #2563eb; }
+        button:disabled { background: #4b5563; cursor: not-allowed; opacity: 0.6; }
+        button.active { background: #10b981; }
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.85);
+            padding: 15px 20px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            font-size: 13px;
+            z-index: 100;
+        }
+        #info h3 { margin-bottom: 8px; color: #3b82f6; }
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 1000;
+        }
+        #loading.hidden { display: none; }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #1f2937;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .preset-btns {
+            display: flex;
+            gap: 5px;
+        }
+        .preset-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+            background: #374151;
+        }
+        .preset-btn:hover { background: #4b5563; }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div id="loading-text">Loading models... 0/96</div>
+    </div>
+
+    <div id="canvas-container"></div>
+    <div id="website-overlay">
+        <div class="website-screen" id="website-screen">
+            <div class="screen-frame"></div>
+            <iframe id="website-iframe" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
+        </div>
+    </div>
+
+    <div id="info">
+        <h3>🌐 Holobox Website Viewer</h3>
+        <div>Frame: <span id="frame-display">0</span> / 95</div>
+        <div>Screen visible: <span id="screen-status">No</span></div>
+    </div>
+
+    <div id="controls">
+        <div class="control-group">
+            <label>Website URL:</label>
+            <input type="text" id="website-url" placeholder="https://example.com" value="https://www.wikipedia.org">
+        </div>
+
+        <button id="load-btn">Load Website</button>
+
+        <button id="prev-btn">←</button>
+        <button id="next-btn">→</button>
+
+        <div class="control-group">
+            <label>Screen Frame:</label>
+            <input type="range" id="screen-frame" min="0" max="95" value="60">
+            <span id="frame-val">60</span>
+        </div>
+
+        <div class="control-group">
+            <label>Frame:</label>
+            <input type="range" id="frame-slider" min="0" max="95" value="0" style="width: 120px;">
+        </div>
+
+        <div class="control-group">
+            <label>Animation:</label>
+            <button id="play-btn">Play</button>
+        </div>
+
+        <div class="control-group">
+            <label>Speed:</label>
+            <input type="range" id="speed" min="5" max="60" value="30">
+            <span id="speed-val">30</span> fps
+        </div>
+
+        <button id="reset-btn">Reset</button>
+
+        <div class="preset-btns">
+            <button class="preset-btn" onclick="loadPreset('https://www.wikipedia.org')">Wiki</button>
+            <button class="preset-btn" onclick="loadPreset('https://threejs.org')">Three.js</button>
+            <button class="preset-btn" onclick="loadPreset('https://news.ycombinator.com')">HN</button>
+            <button class="preset-btn" onclick="loadPreset('https://google.com')">Google</button>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+        // Scene setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0f);
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(30, 20, 30);
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(20, 30, 20);
+        directionalLight.castShadow = true;
+        scene.add(directionalLight);
+
+        const fillLight = new THREE.DirectionalLight(0x4a9eff, 0.3);
+        fillLight.position.set(-20, 10, -20);
+        scene.add(fillLight);
+
+        // Ground
+        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundMaterial = new THREE.MeshStandardMaterial({
+            color: 0x1a1a2e,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -5;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Model storage
+        const models = [];
+        let currentFrame = 0;
+        let currentMesh = null;
+        let isPlaying = false;
+        let animationId = null;
+        let lastFrameTime = 0;
+        let fps = 30;
+        const frameInterval = 1000 / fps;
+
+        // Screen position (will be calculated from model)
+        let screenPosition = new THREE.Vector3(-20, 0, 0);
+        let screenVisible = false;
+        let screenFrameTarget = 60;
+        let screenFrameRange = 5;
+
+        // DOM elements
+        const websiteScreen = document.getElementById('website-screen');
+        const websiteIframe = document.getElementById('website-iframe');
+        const screenStatus = document.getElementById('screen-status');
+
+        // OBJ Loader
+        const objLoader = new OBJLoader();
+        const loadingText = document.getElementById('loading-text');
+        const loadingDiv = document.getElementById('loading');
+
+        // Load all models
+        async function loadModels() {
+            const loadPromises = [];
+
+            for (let i = 0; i < 96; i++) {
+                const promise = new Promise((resolve, reject) => {
+                    objLoader.load(
+                        `model_${i}.obj`,
+                        (object) => {
+                            const mesh = object.children[0];
+                            if (mesh) {
+                                mesh.castShadow = true;
+                                mesh.receiveShadow = true;
+                                const box = new THREE.Box3().setFromObject(mesh);
+                                const center = box.getCenter(new THREE.Vector3());
+                                mesh.position.sub(center);
+                            }
+                            models[i] = object;
+                            resolve();
+                        },
+                        undefined,
+                        reject
+                    );
+                });
+                loadPromises.push(promise);
+
+                promise.then(() => {
+                    const loaded = models.filter(m => m !== undefined).length;
+                    loadingText.textContent = `Loading models... ${loaded}/96`;
+                });
+            }
+
+            try {
+                await Promise.all(loadPromises);
+                loadingDiv.classList.add('hidden');
+                showFrame(0);
+                animate();
+            } catch (error) {
+                console.error('Error loading models:', error);
+                loadingText.textContent = 'Error loading models';
+            }
+        }
+
+        // Show specific frame
+        function showFrame(frameIndex) {
+            if (currentMesh) {
+                scene.remove(currentMesh);
+            }
+
+            if (models[frameIndex]) {
+                currentMesh = models[frameIndex].clone();
+                scene.add(currentMesh);
+            }
+
+            document.getElementById('frame-display').textContent = frameIndex;
+            document.getElementById('frame-slider').value = frameIndex;
+            currentFrame = frameIndex;
+
+            // Update screen visibility based on frame
+            updateScreenVisibility();
+        }
+
+        // Update screen visibility
+        function updateScreenVisibility() {
+            const shouldShow = currentFrame >= (screenFrameTarget - screenFrameRange) &&
+                              currentFrame <= (screenFrameTarget + screenFrameRange);
+
+            if (shouldShow !== screenVisible) {
+                screenVisible = shouldShow;
+
+                if (screenVisible) {
+                    websiteScreen.classList.add('visible');
+                    screenStatus.textContent = 'Yes';
+                    screenStatus.style.color = '#10b981';
+                } else {
+                    websiteScreen.classList.remove('visible');
+                    screenStatus.textContent = 'No';
+                    screenStatus.style.color = '#9ca3af';
+                }
+            }
+
+            // Update screen position
+            updateScreenPosition();
+        }
+
+        // Update screen position in 2D
+        function updateScreenPosition() {
+            // Project 3D position to 2D screen space
+            const screenPos = screenPosition.clone();
+            screenPos.project(camera);
+
+            const x = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-(screenPos.y * 0.5) + 0.5) * window.innerHeight;
+
+            websiteScreen.style.left = `${x - 160}px`;
+            websiteScreen.style.top = `${y - 100}px`;
+        }
+
+        // Animation loop
+        function animate(time = 0) {
+            animationId = requestAnimationFrame(animate);
+
+            if (isPlaying) {
+                if (time - lastFrameTime >= frameInterval) {
+                    currentFrame = (currentFrame + 1) % 96;
+                    showFrame(currentFrame);
+                    lastFrameTime = time;
+                }
+            }
+
+            // Always update screen position (for camera movement)
+            if (screenVisible) {
+                updateScreenPosition();
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Controls
+        const playBtn = document.getElementById('play-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const loadBtn = document.getElementById('load-btn');
+        const websiteUrlInput = document.getElementById('website-url');
+        const screenFrameSlider = document.getElementById('screen-frame');
+        const speedSlider = document.getElementById('speed');
+
+        playBtn.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            playBtn.textContent = isPlaying ? 'Pause' : 'Play';
+            playBtn.classList.toggle('active', isPlaying);
+        });
+
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+
+        prevBtn.addEventListener('click', () => {
+            isPlaying = false;
+            playBtn.textContent = 'Play';
+            playBtn.classList.remove('active');
+            currentFrame = (currentFrame - 1 + 96) % 96;
+            showFrame(currentFrame);
+        });
+
+        nextBtn.addEventListener('click', () => {
+            isPlaying = false;
+            playBtn.textContent = 'Play';
+            playBtn.classList.remove('active');
+            currentFrame = (currentFrame + 1) % 96;
+            showFrame(currentFrame);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            isPlaying = false;
+            playBtn.textContent = 'Play';
+            playBtn.classList.remove('active');
+            showFrame(0);
+            camera.position.set(30, 20, 30);
+            controls.target.set(0, 0, 0);
+        });
+
+        loadBtn.addEventListener('click', () => {
+            const url = websiteUrlInput.value.trim();
+            if (url) {
+                loadWebsite(url);
+            }
+        });
+
+        websiteUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                loadBtn.click();
+            }
+        });
+
+        screenFrameSlider.addEventListener('input', (e) => {
+            screenFrameTarget = parseInt(e.target.value);
+            document.getElementById('frame-val').textContent = screenFrameTarget;
+            updateScreenVisibility();
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            fps = parseInt(e.target.value);
+            document.getElementById('speed-val').textContent = fps;
+        });
+
+        // Frame slider
+        const frameSlider = document.getElementById('frame-slider');
+        frameSlider.addEventListener('input', (e) => {
+            isPlaying = false;
+            playBtn.textContent = 'Play';
+            playBtn.classList.remove('active');
+            const frame = parseInt(e.target.value);
+            showFrame(frame);
+        });
+
+        // Load website
+        function loadWebsite(url) {
+            // Add https:// if missing
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+
+            websiteIframe.src = url;
+            loadBtn.textContent = 'Loading...';
+            loadBtn.disabled = true;
+
+            websiteIframe.onload = () => {
+                loadBtn.textContent = 'Load Website';
+                loadBtn.disabled = false;
+            };
+
+            websiteIframe.onerror = () => {
+                loadBtn.textContent = 'Error - Try Again';
+                loadBtn.disabled = false;
+            };
+        }
+
+        // Global preset loader
+        window.loadPreset = function(url) {
+            websiteUrlInput.value = url;
+            loadWebsite(url);
+        };
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case ' ':
+                    e.preventDefault();
+                    playBtn.click();
+                    break;
+                case 'ArrowLeft':
+                    isPlaying = false;
+                    playBtn.textContent = 'Play';
+                    playBtn.classList.remove('active');
+                    currentFrame = (currentFrame - 1 + 96) % 96;
+                    showFrame(currentFrame);
+                    break;
+                case 'ArrowRight':
+                    isPlaying = false;
+                    playBtn.textContent = 'Play';
+                    playBtn.classList.remove('active');
+                    currentFrame = (currentFrame + 1) % 96;
+                    showFrame(currentFrame);
+                    break;
+                case 'r':
+                    resetBtn.click();
+                    break;
+            }
+        });
+
+        // Window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            updateScreenPosition();
+        });
+
+        // Start loading
+        loadModels();
+    </script>
+</body>
+</html>
