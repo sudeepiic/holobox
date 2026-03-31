@@ -1060,13 +1060,10 @@
             toggleBtn.textContent = '🎛️ Show Controls';
         }
 
-        // Auto-load Wikipedia on startup
-        setTimeout(() => {
-            websiteIframe.src = 'https://www.wikipedia.org';
-            websiteEnabled = true;
-            showWebsiteInput.checked = true;
-            updateScreenPosition();
-        }, 2000);
+        // Auto-load Wikipedia on startup (no delay)
+        websiteIframe.src = 'https://www.wikipedia.org';
+        websiteEnabled = true;
+        showWebsiteInput.checked = true;
     </script>
 </body>
 </html>
