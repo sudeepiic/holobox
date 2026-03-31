@@ -59,63 +59,6 @@
             /* Ensure iframe doesn't interfere with 3D transforms */
             backface-visibility: hidden;
         }
-        /* Direction arrows overlay */
-        #direction-arrows {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            z-index: 100;
-        }
-        .direction-arrow {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            font-weight: 600;
-        }
-        .arrow-btn {
-            width: 36px;
-            height: 36px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            transition: all 0.2s;
-            color: #fff;
-        }
-        .arrow-btn:hover {
-            transform: scale(1.1);
-        }
-        .arrow-btn:active {
-            transform: scale(0.95);
-        }
-        .arrow-x { background: #ef4444; }
-        .arrow-y { background: #22c55e; }
-        .arrow-z { background: #3b82f6; }
-        .arrow-label {
-            min-width: 80px;
-        }
-        .screen-glow {
-            position: absolute;
-            top: -15px;
-            left: -15px;
-            right: -15px;
-            bottom: -15px;
-            border: 2px solid rgba(59, 130, 246, 0.5);
-            border-radius: 15px;
-            pointer-events: none;
-            animation: pulse 2s ease-in-out infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 0.5; transform: scale(1); }
-            50% { opacity: 1; transform: scale(1.02); }
-        }
         #controls {
             position: fixed;
             top: 20px;
@@ -441,24 +384,6 @@
         <strong>Holobox Frame 61</strong><br>
         Vertices: <span id="vertex-count">0</span><br>
         Triangles: <span id="triangle-count">0</span>
-    </div>
-
-    <div id="direction-arrows">
-        <div class="direction-arrow">
-            <button class="arrow-btn arrow-x" id="arrow-x-neg" title="X Negative (Left)">←</button>
-            <span class="arrow-label">X: <span id="arrow-x-val">-1</span></span>
-            <button class="arrow-btn arrow-x" id="arrow-x-pos" title="X Positive (Right)">→</button>
-        </div>
-        <div class="direction-arrow">
-            <button class="arrow-btn arrow-y" id="arrow-y-neg" title="Y Negative (Down)">↓</button>
-            <span class="arrow-label">Y: <span id="arrow-y-val">0</span></span>
-            <button class="arrow-btn arrow-y" id="arrow-y-pos" title="Y Positive (Up)">↑</button>
-        </div>
-        <div class="direction-arrow">
-            <button class="arrow-btn arrow-z" id="arrow-z-neg" title="Z Negative (Away)">-</button>
-            <span class="arrow-label">Z: <span id="arrow-z-val">0</span></span>
-            <button class="arrow-btn arrow-z" id="arrow-z-pos" title="Z Positive (Closer)">+</button>
-        </div>
     </div>
 
     <script type="importmap">
