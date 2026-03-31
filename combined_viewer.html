@@ -1142,6 +1142,13 @@
         updatePortraitMode();
         loadAndCombineModels();
 
+        // Hide controls by default on mobile
+        if (window.innerWidth <= 768) {
+            controlsVisible = false;
+            controlsPanel.classList.add('hidden');
+            toggleBtn.textContent = '🎛️ Show Controls';
+        }
+
         // Auto-load Wikipedia on startup
         setTimeout(() => {
             websiteIframe.src = 'https://www.wikipedia.org';
